@@ -78,11 +78,11 @@ public class Main {
         double target = -4.0;
         results[0] = initialConditions;
 
-        // PID constants
-        double P = 100;
-        double I = 0;
-        double D = 20;
-        double m = 10;
+        // PID constants    // UNITS - must be consistent across program
+        double P = 1000;     // force/position
+        double I = 0;       // force/accumulated error
+        double D = 300;      // force/velocity
+        double m = 10;      // mass
 
         // Run the simulation
         for (int i = 1; i < length; i++) {
