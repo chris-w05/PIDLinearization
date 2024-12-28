@@ -73,7 +73,7 @@ public class Motor {
 
     public double controllerSingalFromTorque( double torque, double velocity){
         double maxTorque = maxTorqueFromVel(velocity);
-        return torque/maxTorque;
+        return Math.max( Math.min(torque/maxTorque, 1), -1);
     }
 
     public double maxCurrentFromVel(double velocity){

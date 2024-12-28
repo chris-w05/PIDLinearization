@@ -22,8 +22,8 @@ public class Main {
      * @return The computed feedforward force.
      */
     private static double feedForwardFunction(double y) {
-        // return 0.0;
-        return -9.81 * 10 * .5 * Math.cos(y); // Gravitational force
+         return 0.0;
+        //return -9.81 * 1 * .5 * Math.cos(y); // Gravitational force
     }
 
     /**
@@ -38,8 +38,9 @@ public class Main {
      */
     private static double systemForces(double position, double velocity, double mass) {
         // Gravity force based on position (assuming vertical motion)
-        return -9.81 * mass * .5 * Math.cos(position);
+        //return -9.81 * mass * .5 * Math.cos(position);
         // return -9.81 * mass;
+        return 0.0;
     }
 
     /**
@@ -68,7 +69,7 @@ public class Main {
     public static void main(String[] args) throws IOException {
         // Simulation settings
         double startTime = 0.0; // Start time for the simulation
-        double endTime = 10.0;  // End time for the simulation
+        double endTime = 20.0;  // End time for the simulation
         double dt = 0.0001;      // Time step for the simulation
         double[] initialConditions = {0, 0, 0}; // Initial conditions: position, error, and velocity
 
@@ -77,15 +78,19 @@ public class Main {
         for (int i = 0; i < targets.length; i++) {
             if (i < targets.length / 4) {
                 targets[i] = 4; // Initial target value
-            } else {
+            }
+            else if (i < targets.length / 2) {
+                targets[i] = 15; // Initial target value
+            }
+             else {
                 targets[i] = 0; // Target value transitions
             }
         }
 
         // PID constants (adjust these values to tune the controller)
-        double P = 6000;  // Proportional constant (force/position)
-        double I = 100;  // Integral constant (force/accumulated error)
-        double D = 300;   // Derivative constant (force/velocity)
+        double P = .1;  // Proportional constant (force/position)
+        double I = .0002;  // Integral constant (force/accumulated error)
+        double D = .05;   // Derivative constant (force/velocity)
         double m = 1;     // Mass of the system
 
         // Motor settings
