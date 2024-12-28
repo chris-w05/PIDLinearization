@@ -1,5 +1,7 @@
 package com.main;
 
+import java.util.ArrayList;
+
 import javax.swing.JFrame;
 
 import org.jfree.chart.ChartFactory;
@@ -24,17 +26,52 @@ class ChartPlotter {
      * @param title The title of the chart.
      * @param xLabel The label for the x-axis (typically "Time").
      * @param yLabel The label for the y-axis (depends on the data).
-     * @param results A 2D array containing simulation results where each row represents a time step.
-     * @param startTime The start time of the simulation.
-     * @param dt The time step between simulation points.
-     * @param dataIndex The index of the data series to plot (e.g., 0 for position, 1 for error, etc.).
+     * @param results A 1D array containing simulation results where each row represents a time step.
+     * @param times A 1D array of times
      */
-    public void createChart(String title, String xLabel, String yLabel, double[][] results, double startTime, double dt, int dataIndex) {
+    public void createChart(String title, String xLabel, String yLabel, double[] results, double startTime, double dt) {
         // Create a series for the data to be plotted
         XYSeries series = new XYSeries(title);
         for (int i = 0; i < results.length; i++) {
             double time = startTime + i * dt;
-            series.add(time, results[i][dataIndex]);
+            series.add(time, results[i]);
+        }
+
+        // Add the series to a dataset
+        XYSeriesCollection dataset = new XYSeriesCollection();
+        dataset.addSeries(series);
+
+        // Create the chart using JFreeChart
+        JFreeChart chart = ChartFactory.createXYLineChart(
+                title,  // chart title
+                xLabel, // x-axis label
+                yLabel, // y-axis label
+                dataset // data
+        );
+
+        // Display the chart in a new window
+        JFrame frame = new JFrame(title);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.add(new ChartPanel(chart));
+        frame.pack();
+        frame.setVisible(true);
+    }
+
+    /**
+     * Creates a simple XY line chart for a single data series.
+     * 
+     * @param title The title of the chart.
+     * @param xLabel The label for the x-axis (typically "Time").
+     * @param yLabel The label for the y-axis (depends on the data).
+     * @param results A 1D array containing simulation results where each row represents a time step.
+     * @param times A 1D array of times
+     */
+    public void createCommandChart(String title, String xLabel, String yLabel, ArrayList<Double> results, double startTime, double dt) {
+        // Create a series for the data to be plotted
+        XYSeries series = new XYSeries(title);
+        for (int i = 0; i < results.size(); i+=4) {
+            double time = startTime + i * dt/4;
+            series.add(time, results.get(i));
         }
 
         // Add the series to a dataset

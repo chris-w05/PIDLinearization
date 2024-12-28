@@ -1,6 +1,7 @@
 package com.main;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * Main class that runs the simulation for a motor control system.
@@ -83,7 +84,7 @@ public class Main {
 
         // PID constants (adjust these values to tune the controller)
         double P = 6000;  // Proportional constant (force/position)
-        double I = 1000;  // Integral constant (force/accumulated error)
+        double I = 100;  // Integral constant (force/accumulated error)
         double D = 300;   // Derivative constant (force/velocity)
         double m = 1;     // Mass of the system
 
@@ -91,6 +92,9 @@ public class Main {
         Motor motor = MotorLoader.loadMotorByName("Kraken X60 (FOC)*"); // Load motor by name
         double maxMotorVoltage = 12; // Maximum voltage for the motor
         motor.setCurrentLimit(40.0); // Set current limit for the motor
+        ArrayList<Double> motorCommands = new ArrayList<Double>();
+
+        int count = 0;
 
         // Create the RK4 solver with the control system dynamics
         RK4Solver solver = new RK4Solver((input, target, params) -> {
@@ -111,16 +115,18 @@ public class Main {
             double da = (y - target); // Error term (difference between target and current position)
             
             // Calculate motor force, including feedforward and PID control
-            double maxForce = motor.torqueFromVel(b / forceMultiplier); 
+            double maxForce = motor.maxTorqueFromVel(b / forceMultiplier); 
             double motorForce = forceMultiplier * Math.max(-maxForce, Math.min(
                 (-D_ * b - I_ * a - P_ * (y - target) - feedForwardFunction(y)), maxForce));
             
+            motorCommands.add(motor.controllerSingalFromTorque(motorForce/forceMultiplier, b*forceMultiplier));
+            
             // Update velocity using Newton's second law
             double db = (motorForce + systemForces(y, b, m_)) / m_;
-
             // Return the state derivatives
             return new double[]{dy, da, db};
         });
+
 
         // Run the simulation using the RK4 solver
         double[][] results = solver.runSimulation(initialConditions, targets, new double[]{P, I, D, m}, startTime, endTime, dt);
@@ -128,6 +134,7 @@ public class Main {
         // Create and display the simulation results using charts
         ChartPlotter plotter = new ChartPlotter();
         plotter.createCombinedChart("System Simulation Results", "Time (s)", results, startTime, dt, true, false, false, false);
+        plotter.createCommandChart("Motor commmands over time", "time", "Motor command value", motorCommands, 0.0, dt);
         // Additional individual charts can be created here for position, error, velocity, etc.
     }
 }
