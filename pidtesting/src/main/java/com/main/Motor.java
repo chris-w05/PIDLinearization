@@ -67,8 +67,13 @@ public class Motor {
         return vFree * desired_i/freeCurrent.getMagnitude();
     }
 
-    public double torqueFromVel(double velocity){
+    public double maxTorqueFromVel(double velocity){
         return  kT*maxCurrentFromVel(velocity);
+    }
+
+    public double controllerSingalFromTorque( double torque, double velocity){
+        double maxTorque = maxTorqueFromVel(velocity);
+        return Math.max( Math.min(torque/maxTorque, 1), -1);
     }
 
     public double maxCurrentFromVel(double velocity){
@@ -84,7 +89,7 @@ public class Motor {
         falcon500.setCurrentLimit(100);
         for( int i = 0; i < numberPoints; i ++ ){
             double velocity = maxV * i / numberPoints;
-            series.add( velocity, falcon500.torqueFromVel( velocity));
+            series.add( velocity, falcon500.maxTorqueFromVel( velocity));
         }
         XYSeriesCollection dataset = new XYSeriesCollection();
         dataset.addSeries(series);
