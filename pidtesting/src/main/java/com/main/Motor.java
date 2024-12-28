@@ -17,6 +17,7 @@ public class Motor {
     private final double iFree;         // Amp
     private final double resistance;    // Ohm
     private double currentLimit = 40;        // Amp
+    private final double vFree = 12;    //Volts
 
     // Additional fields for JSON
     private String name;
@@ -59,6 +60,11 @@ public class Motor {
         //System.out.println( kT + " " + v_applied + " " + velocity + " " + kV + " " + resistance + " " + currentLimit + " " + iFree);
 
         return kT * (Math.min((v_applied - velocity / kV) / resistance, currentLimit) - iFree);
+    }
+
+    public double voltageFromTorque(double torque){
+        double desired_i = torque/kT;
+        return vFree * desired_i/freeCurrent.getMagnitude();
     }
 
     public double torqueFromVel(double velocity){

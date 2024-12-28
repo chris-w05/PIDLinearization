@@ -21,6 +21,7 @@ public class Main {
      * @return The computed feedforward force.
      */
     private static double feedForwardFunction(double y) {
+        // return 0.0;
         return -9.81 * 10 * .5 * Math.cos(y); // Gravitational force
     }
 
@@ -37,6 +38,7 @@ public class Main {
     private static double systemForces(double position, double velocity, double mass) {
         // Gravity force based on position (assuming vertical motion)
         return -9.81 * mass * .5 * Math.cos(position);
+        // return -9.81 * mass;
     }
 
     /**
