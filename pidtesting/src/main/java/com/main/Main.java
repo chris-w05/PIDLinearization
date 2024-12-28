@@ -1,122 +1,131 @@
 package com.main;
 
-import java.util.function.Function;
+import java.io.IOException;
 
-import javax.swing.JFrame;
-
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.data.xy.XYSeries;
-import org.jfree.data.xy.XYSeriesCollection;
-
+/**
+ * Main class that runs the simulation for a motor control system.
+ * This class demonstrates the use of a Runge-Kutta 4th order (RK4) solver
+ * to simulate a system's behavior with PID control, including force calculations
+ * based on position, velocity, and a motor's response.
+ */
 public class Main {
 
-    // Numerical approximation of Laplace transform (untested)
-    public static class LaplaceTransform {
-        public static double laplaceTransform(Function<Double, Double> f, double s) {
-            double result = 0;
-            double dt = 0.001; // Step size for numerical integration
-            for (double t = 0; t < 100; t += dt) { // Integrate from 0 to a large value
-                result += f.apply(t) * Math.exp(-s * t) * dt;
-            }
-            return result;
-        }
-    }
-
+    /**
+     * Calculates the feedforward term based on the given position (y).
+     * The feedforward term represents a physical force based on gravitational acceleration and position.
+     * This is a force requested from the motor dependent on the position (not proportional to position).
+     * The intention is that the feedForward function should calcel the external forces on the system, leaving
+     * a nice linear space for the PID control to live.
+     * 
+     * @param y The position of the system, used to calculate the feedforward force.
+     * @return The computed feedforward force.
+     */
     private static double feedForwardFunction(double y) {
-        return Math.cos(y);
+        return -9.81 * 10 * .5 * Math.cos(y); // Gravitational force
     }
 
-    private static double[] ODELinearized(double[] input, double target, double P, double I, double D, double m) {
-        // y = position, a = accumulated error, b = velocity
-        double y = input[0];
-        double a = input[1];
-        double b = input[2];
-        double dy = b;
-        double da = y;
-        double db = (-D * b - I * a - P * (y-target) - feedForwardFunction(y)) / m;
-        return new double[]{dy, da, db};
+    /**
+     * Calculates the total forces acting on the system based on position, velocity, and mass.
+     * This method includes gravitational forces dependent on the position. This is everything putting forces on the system
+     * outside of the motor. (Friction, vibration, gravity, another robot, etc)
+     *
+     * @param position The current position of the system.
+     * @param velocity The current velocity of the system.
+     * @param mass The mass of the system, affecting the gravitational force.
+     * @return The net force acting on the system.
+     */
+    private static double systemForces(double position, double velocity, double mass) {
+        // Gravity force based on position (assuming vertical motion)
+        return -9.81 * mass * .5 * Math.cos(position);
     }
 
-    public static double[] rk4Onestep(double[] currentState, double target, double P, double I, double D, double m, double dt) {
-        double[] k1 = ODELinearized(currentState, target, P, I, D, m);
-        double[] k2 = ODELinearized(add(currentState, mult(k1, dt / 2)), target, P, I, D, m);
-        double[] k3 = ODELinearized(add(currentState, mult(k2, dt / 2)), target, P, I, D, m);
-        double[] k4 = ODELinearized(add(currentState, mult(k3, dt)), target, P, I, D, m);
-
-        return add(currentState, mult(add(k1, mult(k2, 2), mult(k3, 2), k4), dt / 6));
+    /**
+     * Multiplies the force based on the current position.
+     * This function could represent an additional scaling factor or a system-specific adjustment.
+     * This is used to model things such as linkages, gear ratios, or anything that uses conservation of
+     * energy between the input and output of the system.
+     * 
+     * Also note that this also is what handles the unit conversion between the output velocity(units depend on the scenario) and input velocity(rpm)
+     * 
+     * @param position The position of the system, used to calculate the scaling factor.
+     * @return The force multiplier based on the position.
+     */
+    private static double forceMultiplication(double position) {
+        return 100; // Arbitrary scaling factor for the force based on position
     }
 
-    public static double[] add(double[]... arrays) {
-        int length = arrays[0].length;
-        double[] result = new double[length];
-        for (double[] array : arrays) {
-            for (int i = 0; i < length; i++) {
-                result[i] += array[i];
+    /**
+     * Main method that sets up and runs the motor control system simulation.
+     * It initializes the PID constants, motor settings, and the RK4 solver to simulate system behavior
+     * and generates plots of the simulation results.
+     * 
+     * @param args Command-line arguments, not used in this implementation.
+     * @throws IOException If there is an issue loading the motor or plotting the chart.
+     */
+    public static void main(String[] args) throws IOException {
+        // Simulation settings
+        double startTime = 0.0; // Start time for the simulation
+        double endTime = 10.0;  // End time for the simulation
+        double dt = 0.0001;      // Time step for the simulation
+        double[] initialConditions = {0, 0, 0}; // Initial conditions: position, error, and velocity
+
+        // Set up the target trajectory for the simulation (e.g., a position setpoint)
+        double[] targets = new double[(int) Math.ceil((endTime - startTime) / dt)];
+        for (int i = 0; i < targets.length; i++) {
+            if (i < targets.length / 4) {
+                targets[i] = 4; // Initial target value
+            } else {
+                targets[i] = 0; // Target value transitions
             }
         }
-        return result;
-    }
 
-    public static double[] mult(double[] arr, double scalar) {
-        double[] result = new double[arr.length];
-        for (int i = 0; i < arr.length; i++) {
-            result[i] = arr[i] * scalar;
-        }
-        return result;
-    }
+        // PID constants (adjust these values to tune the controller)
+        double P = 6000;  // Proportional constant (force/position)
+        double I = 1000;  // Integral constant (force/accumulated error)
+        double D = 300;   // Derivative constant (force/velocity)
+        double m = 1;     // Mass of the system
 
-    public static void main(String[] args) {
-        // Simulation settings
-        double finalTime = 10; // seconds
-        double dt = 0.001; // time step
-        int length = (int) Math.ceil(finalTime / dt);
-        double[] initialConditions = {1, 0, 1}; // Initial y, a, b
+        // Motor settings
+        Motor motor = MotorLoader.loadMotorByName("Kraken X60 (FOC)*"); // Load motor by name
+        double maxMotorVoltage = 12; // Maximum voltage for the motor
+        motor.setCurrentLimit(40.0); // Set current limit for the motor
 
-        double[][] results = new double[length][];
-        double target = -4.0;
-        results[0] = initialConditions;
+        // Create the RK4 solver with the control system dynamics
+        RK4Solver solver = new RK4Solver((input, target, params) -> {
+            // Unpack the state variables
+            double y = input[0]; // Position
+            double a = input[1]; // Error (accumulated)
+            double b = input[2]; // Velocity
 
-        // PID constants    // UNITS - must be consistent across program
-        double P = 1000;     // force/position
-        double I = 0;       // force/accumulated error
-        double D = 300;      // force/velocity
-        double m = 10;      // mass
+            // Unpack the PID and system parameters
+            double P_ = params[0];
+            double I_ = params[1];
+            double D_ = params[2];
+            double m_ = params[3];
 
-        // Run the simulation
-        for (int i = 1; i < length; i++) {
-            results[i] = rk4Onestep(results[i - 1], target, P, I, D, m, dt);
-        }
+            // State equations for the system
+            double dy = b; // Position derivative is the velocity
+            double forceMultiplier = forceMultiplication(y); // Apply force multiplier
+            double da = (y - target); // Error term (difference between target and current position)
+            
+            // Calculate motor force, including feedforward and PID control
+            double maxForce = motor.torqueFromVel(b / forceMultiplier); 
+            double motorForce = forceMultiplier * Math.max(-maxForce, Math.min(
+                (-D_ * b - I_ * a - P_ * (y - target) - feedForwardFunction(y)), maxForce));
+            
+            // Update velocity using Newton's second law
+            double db = (motorForce + systemForces(y, b, m_)) / m_;
 
-        // Create and display the chart
-        XYSeries ySeries = new XYSeries("Position (y)");
-        //XYSeries aSeries = new XYSeries("Accumulated Error (a)");
-        //XYSeries bSeries = new XYSeries("Velocity (b)");
+            // Return the state derivatives
+            return new double[]{dy, da, db};
+        });
 
-        for (int i = 0; i < length; i++) {
-            double time = i * dt;
-            ySeries.add(time, results[i][0]);
-            // aSeries.add(time, results[i][1]);
-            // bSeries.add(time, results[i][2]);
-        }
+        // Run the simulation using the RK4 solver
+        double[][] results = solver.runSimulation(initialConditions, targets, new double[]{P, I, D, m}, startTime, endTime, dt);
 
-        XYSeriesCollection dataset = new XYSeriesCollection();
-        dataset.addSeries(ySeries);
-        // dataset.addSeries(aSeries);
-        // dataset.addSeries(bSeries);
-
-        JFreeChart chart = ChartFactory.createXYLineChart(
-                "System Simulation Results",
-                "Time (s)",
-                "Values",
-                dataset
-        );
-
-        JFrame frame = new JFrame("Simulation Results");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.add(new ChartPanel(chart));
-        frame.pack();
-        frame.setVisible(true);
+        // Create and display the simulation results using charts
+        ChartPlotter plotter = new ChartPlotter();
+        plotter.createCombinedChart("System Simulation Results", "Time (s)", results, startTime, dt, true, false, false, false);
+        // Additional individual charts can be created here for position, error, velocity, etc.
     }
 }
