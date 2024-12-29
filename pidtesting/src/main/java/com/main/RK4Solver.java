@@ -7,11 +7,11 @@ class RK4Solver {
         this.odeFunction = odeFunction;
     }
 
-    public double[] step(double[] currentState, double target, double[] params, double dt) {
-        double[] k1 = odeFunction.compute(currentState, target, params);
-        double[] k2 = odeFunction.compute(add(currentState, mult(k1, dt / 2)), target, params);
-        double[] k3 = odeFunction.compute(add(currentState, mult(k2, dt / 2)), target, params);
-        double[] k4 = odeFunction.compute(add(currentState, mult(k3, dt)), target, params);
+    public double[] step(double[] currentState, double target, double[] params, double time, double dt) {
+        double[] k1 = odeFunction.compute(currentState, target, params, time);
+        double[] k2 = odeFunction.compute(add(currentState, mult(k1, dt / 2)), target, params, time + dt/2);
+        double[] k3 = odeFunction.compute(add(currentState, mult(k2, dt / 2)), target, params, time + dt/2);
+        double[] k4 = odeFunction.compute(add(currentState, mult(k3, dt)), target, params, time + dt);
 
         return add(currentState, mult(add(k1, mult(k2, 2), mult(k3, 2), k4), dt / 6));
     }
@@ -23,7 +23,7 @@ class RK4Solver {
 
         for (int i = 1; i < steps; i++) {
             double target = targets[i - 1];
-            results[i] = step(results[i - 1], target, params, dt);
+            results[i] = step(results[i - 1], target, params, i *dt, dt);
         }
 
         return results;
@@ -51,5 +51,5 @@ class RK4Solver {
 
 @FunctionalInterface
 interface ODEFunction {
-    double[] compute(double[] state, double target, double[] params);
+    double[] compute(double[] state, double target, double[] params, double time);
 }
