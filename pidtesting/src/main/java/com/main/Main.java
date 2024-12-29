@@ -94,10 +94,22 @@ public class Main {
         double D = .15;   // Derivative constant (force/velocity)
         double m = 1;     // Mass of the system
 
+        //Secondary PID constants for values close to target
+        boolean dualStage = false; //Turns dual stage control on and off
+        double threshold = 1; //Distance to target to switch constants
+        double P2 = .5;  // Proportional constant (force/position)
+        double I2 = .1;  // Integral constant (force/accumulated error)
+        double D2 = .5;   // Derivative constant (force/velocity)
+
         // Motor settings
         Motor motor = MotorLoader.loadMotorByName("Kraken X60 (FOC)*"); // Load motor by name
         motor.setCurrentLimit(40.0); // Set current limit for the motor
-        ArrayList<Double> motorCommands = new ArrayList<Double>();
+        ArrayList<Double> motorCommands = new ArrayList<>();
+
+        // Maximum Velocty
+        double maxVelocity = 10;
+        // Maxiumum Acceleration
+        double maxAcceleration = 10;
 
 
         // Create the RK4 solver with the control system dynamics
@@ -112,34 +124,45 @@ public class Main {
             double I_ = params[1];
             double D_ = params[2];
             double m_ = params[3];
+            if (dualStage && (Math.abs(y - target) < threshold)){
+                P_ = params[4];
+                I_ = params[5];
+                D_ = params[6];
+            }
 
             // State equations for the system
             double dy = b; // Position derivative is the velocity
             double forceMultiplier = forceMultiplication(y); // Apply force multiplier
             double da = (y - target); // Error term (difference between target and current position)
             
+            double systemForces = systemForces(y, b, time);
             // Calculate motor force, including feedforward and PID control
             double maxForce = motor.maxTorqueFromVel(b / forceMultiplier); 
+            //Find force to cause acceleration of acceleration limit F = ma
+            // motorForce = 
+
             double motorForce = forceMultiplier * Math.max(-maxForce, Math.min(
                 (-D_ * b - I_ * a - P_ * (y - target) - feedForwardFunction(y)/forceMultiplier), maxForce));
+            
+            
             
             
             motorCommands.add(motor.controllerSingalFromTorque(motorForce/forceMultiplier, b*forceMultiplier));
             
             // Update velocity using Newton's second law
-            double db = (motorForce + systemForces(y, b, time)) / m_;
+            double db = (motorForce + systemForces) / m_;
             // Return the state derivatives
             return new double[]{dy, da, db};
         });
 
 
         // Run the simulation using the RK4 solver
-        double[][] results = solver.runSimulation(initialConditions, targets, new double[]{P, I, D, m}, startTime, endTime, dt);
+        double[][] results = solver.runSimulation(initialConditions, targets, new double[]{P, I, D, m, P2, I2, D2}, startTime, endTime, dt);
 
         // Create and display the simulation results using charts
         ChartPlotter plotter = new ChartPlotter();
         plotter.createCombinedChart("System Simulation Results", "Time (s)", results, startTime, dt, true, false, false, false);
-        plotter.createCommandChart("Motor commmands over time", "time", "Motor command value", motorCommands, 0.0, dt);
+        //plotter.createCommandChart("Motor commmands over time", "time", "Motor command value", motorCommands, 0.0, dt);
         // double[] forces = new double[targets.length];
         // for(int i = 0; i < forces.length; i ++){
         //     forces[i] = systemForces( results[i][0], results[i][2], i * dt);
