@@ -22,9 +22,9 @@ public class Main {
      * @return The computed feedforward force.
      */
     private static double feedForwardFunction(double y) {
-        // return 0.0;
+        return 0.0;
         //return -9.81 * 1 * .5 * Math.cos(y); // Gravitational force
-        return -9.81 * 1;
+        // return -9.81 * 1;
     }
 
     /**
@@ -34,13 +34,13 @@ public class Main {
      *
      * @param position The current position of the system.
      * @param velocity The current velocity of the system.
-     * @param mass The mass of the system, affecting the gravitational force.
+     * @param time The current time of the system
      * @return The net force acting on the system.
      */
-    private static double systemForces(double position, double velocity, double mass) {
+    private static double systemForces(double position, double velocity, double time) {
         // Gravity force based on position (assuming vertical motion)
         //return -9.81 * mass * .5 * Math.cos(position);
-        return -9.81 * mass;
+        return -9.81 * 1;
         // return 0.0;
     }
 
@@ -78,10 +78,10 @@ public class Main {
         double[] targets = new double[(int) Math.ceil((endTime - startTime) / dt)];
         for (int i = 0; i < targets.length; i++) {
             if (i < targets.length / 4) {
-                targets[i] = 4; // Initial target value
+                targets[i] = 10; // Initial target value
             }
             else if (i < targets.length / 2) {
-                targets[i] = 15; // Initial target value
+                targets[i] = -10; // Initial target value
             }
              else {
                 targets[i] = 0; // Target value transitions
@@ -89,21 +89,19 @@ public class Main {
         }
 
         // PID constants (adjust these values to tune the controller)
-        double P = .1;  // Proportional constant (force/position)
-        double I = .000;  // Integral constant (force/accumulated error)
-        double D = .05;   // Derivative constant (force/velocity)
+        double P = .5;  // Proportional constant (force/position)
+        double I = .05;  // Integral constant (force/accumulated error)
+        double D = .15;   // Derivative constant (force/velocity)
         double m = 1;     // Mass of the system
 
         // Motor settings
         Motor motor = MotorLoader.loadMotorByName("Kraken X60 (FOC)*"); // Load motor by name
-        double maxMotorVoltage = 12; // Maximum voltage for the motor
         motor.setCurrentLimit(40.0); // Set current limit for the motor
         ArrayList<Double> motorCommands = new ArrayList<Double>();
 
-        int count = 0;
 
         // Create the RK4 solver with the control system dynamics
-        RK4Solver solver = new RK4Solver((input, target, params) -> {
+        RK4Solver solver = new RK4Solver((input, target, params, time) -> {
             // Unpack the state variables
             double y = input[0]; // Position
             double a = input[1]; // Error (accumulated)
@@ -129,7 +127,7 @@ public class Main {
             motorCommands.add(motor.controllerSingalFromTorque(motorForce/forceMultiplier, b*forceMultiplier));
             
             // Update velocity using Newton's second law
-            double db = (motorForce + systemForces(y, b, m_)) / m_;
+            double db = (motorForce + systemForces(y, b, time)) / m_;
             // Return the state derivatives
             return new double[]{dy, da, db};
         });
@@ -142,6 +140,12 @@ public class Main {
         ChartPlotter plotter = new ChartPlotter();
         plotter.createCombinedChart("System Simulation Results", "Time (s)", results, startTime, dt, true, false, false, false);
         plotter.createCommandChart("Motor commmands over time", "time", "Motor command value", motorCommands, 0.0, dt);
+        // double[] forces = new double[targets.length];
+        // for(int i = 0; i < forces.length; i ++){
+        //     forces[i] = systemForces( results[i][0], results[i][2], i * dt);
+        // }
+
+        //plotter.createChart("Forces vs time", "Time", "Force", forces , 0.0, dt);
         // Additional individual charts can be created here for position, error, velocity, etc.
     }
 }
