@@ -22,8 +22,9 @@ public class Main {
      * @return The computed feedforward force.
      */
     private static double feedForwardFunction(double y) {
-         return 0.0;
+        // return 0.0;
         //return -9.81 * 1 * .5 * Math.cos(y); // Gravitational force
+        return -9.81 * 1;
     }
 
     /**
@@ -39,8 +40,8 @@ public class Main {
     private static double systemForces(double position, double velocity, double mass) {
         // Gravity force based on position (assuming vertical motion)
         //return -9.81 * mass * .5 * Math.cos(position);
-        // return -9.81 * mass;
-        return 0.0;
+        return -9.81 * mass;
+        // return 0.0;
     }
 
     /**
@@ -89,7 +90,7 @@ public class Main {
 
         // PID constants (adjust these values to tune the controller)
         double P = .1;  // Proportional constant (force/position)
-        double I = .0002;  // Integral constant (force/accumulated error)
+        double I = .000;  // Integral constant (force/accumulated error)
         double D = .05;   // Derivative constant (force/velocity)
         double m = 1;     // Mass of the system
 
@@ -122,7 +123,8 @@ public class Main {
             // Calculate motor force, including feedforward and PID control
             double maxForce = motor.maxTorqueFromVel(b / forceMultiplier); 
             double motorForce = forceMultiplier * Math.max(-maxForce, Math.min(
-                (-D_ * b - I_ * a - P_ * (y - target) - feedForwardFunction(y)), maxForce));
+                (-D_ * b - I_ * a - P_ * (y - target) - feedForwardFunction(y)/forceMultiplier), maxForce));
+            
             
             motorCommands.add(motor.controllerSingalFromTorque(motorForce/forceMultiplier, b*forceMultiplier));
             
