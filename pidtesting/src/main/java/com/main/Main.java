@@ -1,7 +1,6 @@
 package com.main;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
 /**
  * Main class that runs the simulation for a motor control system.
@@ -10,55 +9,6 @@ import java.util.ArrayList;
  * based on position, velocity, and a motor's response.
  */
 public class Main {
-
-    /**
-     * Calculates the feedforward term based on the given position (y).
-     * The feedforward term represents a physical force based on gravitational acceleration and position.
-     * This is a force requested from the motor dependent on the position (not proportional to position).
-     * The intention is that the feedForward function should calcel the external forces on the system, leaving
-     * a nice linear space for the PID control to live.
-     * 
-     * @param y The position of the system, used to calculate the feedforward force.
-     * @return The computed feedforward force.
-     */
-    private static double feedForwardFunction(double y, double dy, double t) {
-        return 0.0;
-        //return -9.81 * 1 * .5 * Math.cos(y); // Gravitational force
-        // return -9.81 * 1;
-    }
-
-    /**
-     * Calculates the total forces acting on the system based on position, velocity, and mass.
-     * This method includes gravitational forces dependent on the position. This is everything putting forces on the system
-     * outside of the motor. (Friction, vibration, gravity, another robot, etc)
-     *
-     * @param position The current position of the system.
-     * @param velocity The current velocity of the system.
-     * @param time The current time of the system
-     * @return The net force acting on the system.
-     */
-    private static double systemForces(double position, double velocity, double time) {
-        // Gravity force based on position (assuming vertical motion)
-        //return -9.81 * mass * .5 * Math.cos(position);
-        return -9.81 * 10;
-        // return 0.0;
-    }
-
-    /**
-     * Multiplies the force based on the current position.
-     * This function could represent an additional scaling factor or a system-specific adjustment.
-     * This is used to model things such as linkages, gear ratios, or anything that uses conservation of
-     * energy between the input and output of the system.
-     * 
-     * Also note that this also is what handles the unit conversion between the output velocity(units depend on the scenario) and input velocity(rpm)
-     * 
-     * @param position The position of the system, used to calculate the scaling factor.
-     * @return The force multiplier based on the position.
-     */
-    private static double forceMultiplication(double position) {
-        return 100; // Arbitrary scaling factor for the force based on position
-    }
-
     /**
      * Main method that sets up and runs the motor control system simulation.
      * It initializes the PID constants, motor settings, and the RK4 solver to simulate system behavior
@@ -90,27 +40,14 @@ public class Main {
 
         // PID constants (adjust these values to tune the controller)
         double P = .5;  // Proportional constant (force/position)
-        double I = .05;  // Integral constant (force/accumulated error)
-        double D = .15;   // Derivative constant (force/velocity)
+        double I = .00;  // Integral constant (force/accumulated error)
+        double D = .4;   // Derivative constant (force/velocity)
         double m = 10;     // Mass of the system
 
-        //Secondary PID constants for values close to target
-        boolean dualStage = false; //Turns dual stage control on and off
-        double threshold = 1; //Distance to target to switch constants
-        double P2 = .5;  // Proportional constant (force/position)
-        double I2 = .1;  // Integral constant (force/accumulated error)
-        double D2 = .5;   // Derivative constant (force/velocity)
-
+    
         // Motor settings
         Motor motor = MotorLoader.loadMotorByName("Kraken X60 (FOC)*"); // Load motor by name
         motor.setCurrentLimit(40.0); // Set current limit for the motor
-        ArrayList<Double> motorCommands = new ArrayList<>();
-
-        // Maximum Velocty
-        double maxVelocity = 10;
-        // Maxiumum Acceleration
-        double maxAcceleration = 10;
-
 
         //System functions:
         FFFunction feedForward = (position, velocity, time) -> { return -9.81 * 10; };
@@ -119,11 +56,11 @@ public class Main {
 
 
         // Create the RK4 solver with the control system dynamics
-        RK4Solver solver3 = new RK4Solver( motor, feedForward, systemForceFunc, forceMult, RK4Solver.ControlType.POSITION);
+        RK4Solver solver3 = new RK4Solver( P, I, D, m, motor, feedForward, systemForceFunc, forceMult, RK4Solver.ControlType.POSITION);
         
 
         // Run the simulation using the RK4 solver
-        double[][] results = solver3.runSimulation(initialConditions, targets, new double[]{P, I, D, m}, startTime, endTime, dt);
+        double[][] results = solver3.runSimulation(initialConditions, targets, startTime, endTime, dt);
 
         // Create and display the simulation results using charts
         ChartPlotter plotter = new ChartPlotter();
