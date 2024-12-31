@@ -21,7 +21,7 @@ public class Main {
      * @param y The position of the system, used to calculate the feedforward force.
      * @return The computed feedforward force.
      */
-    private static double feedForwardFunction(double y) {
+    private static double feedForwardFunction(double y, double dy, double t) {
         return 0.0;
         //return -9.81 * 1 * .5 * Math.cos(y); // Gravitational force
         // return -9.81 * 1;
@@ -40,7 +40,7 @@ public class Main {
     private static double systemForces(double position, double velocity, double time) {
         // Gravity force based on position (assuming vertical motion)
         //return -9.81 * mass * .5 * Math.cos(position);
-        return -9.81 * 1;
+        return -9.81 * 10;
         // return 0.0;
     }
 
@@ -92,7 +92,7 @@ public class Main {
         double P = .5;  // Proportional constant (force/position)
         double I = .05;  // Integral constant (force/accumulated error)
         double D = .15;   // Derivative constant (force/velocity)
-        double m = 1;     // Mass of the system
+        double m = 10;     // Mass of the system
 
         //Secondary PID constants for values close to target
         boolean dualStage = false; //Turns dual stage control on and off
@@ -112,57 +112,23 @@ public class Main {
         double maxAcceleration = 10;
 
 
+        //System functions:
+        FFFunction feedForward = (position, velocity, time) -> { return -9.81 * 10; };
+        SystemForceFunction systemForceFunc = (position, velocity, time) -> { return -9.81 * 10;};
+        ForceMultiplicationFunction forceMult = (position) -> {return 100;};
+
+
         // Create the RK4 solver with the control system dynamics
-        RK4Solver solver = new RK4Solver((input, target, params, time) -> {
-            // Unpack the state variables
-            double y = input[0]; // Position
-            double a = input[1]; // Error (accumulated)
-            double b = input[2]; // Velocity
-
-            // Unpack the PID and system parameters
-            double P_ = params[0];
-            double I_ = params[1];
-            double D_ = params[2];
-            double m_ = params[3];
-            if (dualStage && (Math.abs(y - target) < threshold)){
-                P_ = params[4];
-                I_ = params[5];
-                D_ = params[6];
-            }
-
-            // State equations for the system
-            double dy = b; // Position derivative is the velocity
-            double forceMultiplier = forceMultiplication(y); // Apply force multiplier
-            double da = (y - target); // Error term (difference between target and current position)
-            
-            double systemForces = systemForces(y, b, time);
-            // Calculate motor force, including feedforward and PID control
-            double maxForce = motor.maxTorqueFromVel(b / forceMultiplier); 
-            //Find force to cause acceleration of acceleration limit F = ma
-            // motorForce = 
-
-            double motorForce = forceMultiplier * Math.max(-maxForce, Math.min(
-                (-D_ * b - I_ * a - P_ * (y - target) - feedForwardFunction(y)/forceMultiplier), maxForce));
-            
-            
-            
-            
-            motorCommands.add(motor.controllerSingalFromTorque(motorForce/forceMultiplier, b*forceMultiplier));
-            
-            // Update velocity using Newton's second law
-            double db = (motorForce + systemForces) / m_;
-            // Return the state derivatives
-            return new double[]{dy, da, db};
-        });
-
+        RK4Solver solver3 = new RK4Solver( motor, feedForward, systemForceFunc, forceMult, RK4Solver.ControlType.POSITION);
+        
 
         // Run the simulation using the RK4 solver
-        double[][] results = solver.runSimulation(initialConditions, targets, new double[]{P, I, D, m, P2, I2, D2}, startTime, endTime, dt);
+        double[][] results = solver3.runSimulation(initialConditions, targets, new double[]{P, I, D, m}, startTime, endTime, dt);
 
         // Create and display the simulation results using charts
         ChartPlotter plotter = new ChartPlotter();
         plotter.createCombinedChart("System Simulation Results", "Time (s)", results, startTime, dt, true, false, false, false);
-        //plotter.createCommandChart("Motor commmands over time", "time", "Motor command value", motorCommands, 0.0, dt);
+        plotter.createCommandChart("Motor commmands over time", "time", "Motor command value", solver3.getMotorCommands(), 0.0, dt);
         // double[] forces = new double[targets.length];
         // for(int i = 0; i < forces.length; i ++){
         //     forces[i] = systemForces( results[i][0], results[i][2], i * dt);

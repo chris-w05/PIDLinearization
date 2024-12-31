@@ -1,10 +1,113 @@
 package com.main;
 
+import java.util.ArrayList;
+
+import com.main.RK4Solver.ControlType;
+
 class RK4Solver {
     private final ODEFunction odeFunction;
+    private ControlType mode;
+    private FFFunction feedForwardFunction;
+    private SystemForceFunction systemForcesFunc;
+    private ForceMultiplicationFunction forceMultiplication;
+    private ArrayList<Double> motorCommands;
+
+    public enum ControlType{
+        POSITION,
+        VELOCITY
+    }
 
     public RK4Solver(ODEFunction odeFunction) {
         this.odeFunction = odeFunction;
+    }
+
+    public RK4Solver( Motor motor, FFFunction ff, SystemForceFunction sff, ForceMultiplicationFunction fmf, ControlType mode ){
+        this.mode = mode;
+        this.feedForwardFunction = ff;
+        this.systemForcesFunc = sff;
+        this.forceMultiplication = fmf;
+        this.mode = mode;
+        
+        motorCommands = new ArrayList<>();
+
+        if( null == mode){
+            this.odeFunction = (input, target, params, time) -> { return new double[]{0, 0, 0};};
+        }
+        else switch (mode) {
+            case POSITION:
+                this.odeFunction = (input, target, params, time) -> {
+                    // Unpack the state variables
+                    double y = input[0]; // Position
+                    double a = input[1]; // Error (accumulated)
+                    double b = input[2]; // Velocity
+                    
+                    // Unpack the PID and system parameters
+                    double P_ = params[0];
+                    double I_ = params[1];
+                    double D_ = params[2];
+                    double m_ = params[3];
+                    
+                    // State equations for the system
+                    double dy = b; // Position derivative is the velocity
+                    double forceMultiplier = forceMultiplication.compute(y); // Apply force multiplier
+                    double da = (y - target); // Error term (difference between target and current position)
+                    
+                    double systemForces = systemForcesFunc.compute(y, b, time);
+                    // Calculate motor force, including feedforward and PID control
+                    double maxForce = motor.maxTorqueFromVel(b / forceMultiplier);
+                    //Find force to cause acceleration of acceleration limit F = ma
+                    // motorForce =
+                    
+                    double motorForce = forceMultiplier * Math.max(-maxForce, Math.min(
+                            (-D_ * b - I_ * a - P_ * (y - target) - feedForwardFunction.compute(y, b, time)/forceMultiplier), maxForce));
+                    
+                    motorCommands.add(motor.controllerSingalFromTorque(motorForce/forceMultiplier, b*forceMultiplier));
+                    
+                    // Update velocity using Newton's second law
+                    double db = (motorForce + systemForces) / m_;
+                    // Return the state derivatives
+                    return new double[]{dy, da, db};
+                };  break;
+            case VELOCITY:
+                this.odeFunction = (input, target, params, time) -> {
+                    // Unpack the state variables
+                    double y = input[0]; // Position
+                    double a = input[1]; // Error (accumulated)
+                    double b = input[2]; // Velocity
+                    
+                    // Unpack the PID and system parameters
+                    double P_ = params[0];
+                    double I_ = params[1];
+                    double D_ = params[2];
+                    double m_ = params[3];
+                    
+                    // State equations for the system
+                    double dy = b; // Position derivative is the velocity
+                    double forceMultiplier = forceMultiplication.compute(y); // Apply force multiplier
+                    double da = (b - target); // Error term (difference between target and current position)
+                    
+                    double systemForces = systemForcesFunc.compute(y, b, time);
+                    // Calculate motor force, including feedforward and PID control
+                    double maxForce = motor.maxTorqueFromVel(b / forceMultiplier);
+                    //Find force to cause acceleration of acceleration limit F = ma
+                    // motorForce =
+                    
+                    double motorForce = forceMultiplier * Math.max(-maxForce, Math.min(
+                            (( - I_ * a - P_ * (b - target))/(1+D_) - feedForwardFunction.compute(y, b, time)/forceMultiplier), maxForce));
+                    
+                    motorCommands.add(motor.controllerSingalFromTorque(motorForce/forceMultiplier, b*forceMultiplier));
+                    
+                    // Update velocity using Newton's second law
+                    double db = (motorForce + systemForces) / m_;
+                    // Return the state derivatives
+                    return new double[]{dy, da, db};
+                };  break;
+            default:
+                this.odeFunction = (input, target, params, time) -> { return new double[]{0, 0, 0};};
+                break;
+        }
+
+
     }
 
     public double[] step(double[] currentState, double target, double[] params, double time, double dt) {
@@ -47,9 +150,29 @@ class RK4Solver {
         }
         return result;
     }
+
+    public ArrayList<Double> getMotorCommands(){
+        return motorCommands;
+    }
 }
 
 @FunctionalInterface
 interface ODEFunction {
     double[] compute(double[] state, double target, double[] params, double time);
 }
+
+@FunctionalInterface
+interface FFFunction{
+    double compute(double position, double velocity, double time);
+}
+
+@FunctionalInterface
+interface SystemForceFunction{
+    double compute(double position, double velocity, double time);
+}
+
+@FunctionalInterface
+interface ForceMultiplicationFunction{
+    double compute(double position);
+}
+
